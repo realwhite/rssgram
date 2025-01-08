@@ -2,11 +2,19 @@ package internal
 
 import (
 	"fmt"
-	"github.com/go-shiori/dom"
-	"golang.org/x/net/html"
+	"math/rand/v2"
+	"mime"
 	"net/http"
 	"time"
+
+	"golang.org/x/net/html"
+
+	"github.com/go-shiori/dom"
 )
+
+var userAgents = []string{
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+}
 
 type SiteDescription struct {
 	Title       string
@@ -26,7 +34,8 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 	if err != nil {
 		return SiteDescription{}, fmt.Errorf("failed to  create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36")
+
+	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -37,7 +46,14 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 
 	defer resp.Body.Close()
 
-	fmt.Println(resp.Header.Get("Content-Type"))
+	mediaType, _, err := mime.ParseMediaType(resp.Header["Content-Type"][0])
+	if err != nil {
+		return SiteDescription{}, fmt.Errorf("failed to parse media type: %w", err)
+	}
+
+	if mediaType != "text/html" {
+		return SiteDescription{}, nil
+	}
 
 	doc, err := html.Parse(resp.Body)
 	if err != nil {
@@ -46,11 +62,13 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 
 	var title, description, image string
 
+	// get site title
 	titleItem := dom.QuerySelector(doc, "title")
 	if titleItem != nil {
 		title = dom.InnerText(titleItem)
 	}
 
+	// get site description
 	regularDescriptionItem := dom.QuerySelector(doc, "meta[name=description]")
 	if regularDescriptionItem != nil {
 		description = dom.GetAttribute(regularDescriptionItem, "content")
@@ -63,6 +81,7 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		}
 	}
 
+	// get image
 	regularImageItem := dom.QuerySelector(doc, "meta[name=image]")
 	if regularImageItem != nil {
 		image = dom.GetAttribute(regularImageItem, "content")

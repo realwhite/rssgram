@@ -2,8 +2,9 @@ package internal
 
 import (
 	"crypto/sha256"
-	"github.com/mmcdole/gofeed"
 	"time"
+
+	"github.com/mmcdole/gofeed"
 )
 
 const defaultInterval = time.Second

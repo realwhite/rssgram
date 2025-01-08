@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/microcosm-cc/bluemonday"
-	"go.uber.org/zap"
 	"html"
 	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"rssgram/internal/utils"
+
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/mmcdole/gofeed"
+	"go.uber.org/zap"
 
 	"rssgram/internal"
 )
@@ -30,19 +32,12 @@ import (
 //		- если тип LIST, то новые посты отправляем просто списком
 //		- если SINGLE, то каждый пост отправляется отдельно
 
-// StorageSync -> FeedFilter ->
-
 func main() {
 
 	cfg := zap.NewProductionConfig()
 	cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	logger, _ := cfg.Build()
 	defer logger.Sync()
-
-	//p := internal.SiteParser{}
-	//fmt.Println(p.GetDescription("https://blog.transparency.dev/postgresql-support-for-certificate-transparency-logs-released"))
-	//fmt.Println(p.GetDescription("https://www.crisesnotes.com/content/files/2023/12/NYFRB-2006.--Doomsday-Book--Searchable.pdf"))
-	//return
 
 	cnf, err := internal.ParseConfig()
 	if err != nil {
@@ -56,6 +51,7 @@ func main() {
 		logger.Fatal(err.Error())
 	}
 
+	// синхронизируем конфиг с базой
 	feeds, err := PrepareFeeds(cnf, storage, logger)
 	if err != nil {
 		logger.Fatal(err.Error())
@@ -98,7 +94,7 @@ func main() {
 			if !feeds[i].IsNew {
 				logger.Debug("start to send messages")
 				var sendErr error
-				if feeds[i].Type == "list" || (feeds[i].Type == "" && len(newItems) > 30) {
+				if feeds[i].Type == "list" || (feeds[i].Type == "" && len(newItems) > 5) {
 					sendErr = SendFeedList(&feeds[i], tg)
 				} else {
 					sendErr = SendFeedPost(&feeds[i], tg)
@@ -280,7 +276,7 @@ func SendFeedPost(f *internal.CommonFeed, tg *internal.TelegramChannelClient) er
 			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", description))
 			sendErr = tg.SendMessage(msg, internal.TelegramMessageOptions{LinkPreview: false})
 		} else {
-			shortDescription := ellipsisString(description, 800)
+			shortDescription := utils.EllipsisString(description, 800)
 			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
 			sendErr = tg.SendPhoto(msg, item.Image.URL)
 		}
@@ -291,13 +287,6 @@ func SendFeedPost(f *internal.CommonFeed, tg *internal.TelegramChannelClient) er
 	}
 
 	return nil
-}
-
-func ellipsisString(s string, max int) string {
-	if max > len(s) {
-		return s
-	}
-	return s[:strings.LastIndexAny(s[:max], " .,:;-")] + "..."
 }
 
 // move to telegram output
