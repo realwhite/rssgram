@@ -85,6 +85,7 @@ func main() {
 			err = FillFeed(&feeds[i])
 			if err != nil {
 				ctxLogger.Error("failed to fill feed", zap.Error(err))
+				return
 			}
 
 			newItems, newLastPosted := FilterFeedItemsByLastPosted(feeds[i].Feed.Items, feeds[i].LastPosted)
@@ -105,6 +106,7 @@ func main() {
 
 				if sendErr != nil {
 					ctxLogger.Error("failed to send feed", zap.Error(sendErr))
+					return
 				}
 
 			}

@@ -1,0 +1,11 @@
+[Unit]
+Description=rssgram timer
+Requires=rssgram.service
+
+[Timer]
+Unit=rssgram.service
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
