@@ -2,10 +2,12 @@ package internal
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/go-shiori/dom"
 	"golang.org/x/net/html"
-	"net/http"
-	"time"
 )
 
 type SiteDescription struct {
@@ -66,6 +68,7 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 	regularImageItem := dom.QuerySelector(doc, "meta[name=image]")
 	if regularImageItem != nil {
 		image = dom.GetAttribute(regularImageItem, "content")
+
 	}
 
 	if image == "" {
@@ -75,11 +78,16 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		}
 	}
 
-	return SiteDescription{
-		title,
-		description,
-		image,
-	}, nil
+	result := SiteDescription{
+		Title:       title,
+		Description: description,
+	}
+
+	if strings.HasPrefix(image, "http://") || strings.HasPrefix(image, "https://") {
+		result.Image = image
+	}
+
+	return result, nil
 }
 
 // https://xnacly.me/posts/2024/extract-metadata-from-html/

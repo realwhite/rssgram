@@ -101,6 +101,9 @@ func (c *TelegramChannelClient) SendMessage(msg string, options TelegramMessageO
 	}
 	req.Header.Add("Content-Type", "application/json")
 
+	reqDump, _ := httputil.DumpRequest(req, true)
+	fmt.Printf("REQ:\n%s\n\n", string(reqDump))
+
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return err

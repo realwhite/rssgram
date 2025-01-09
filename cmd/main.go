@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/microcosm-cc/bluemonday"
-	"go.uber.org/zap"
 	"html"
 	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/microcosm-cc/bluemonday"
+	"go.uber.org/zap"
 
 	"github.com/mmcdole/gofeed"
 
@@ -277,10 +278,11 @@ func SendFeedPost(f *internal.CommonFeed, tg *internal.TelegramChannelClient) er
 
 		var sendErr error
 		if item.Image == nil || item.Image.URL == "" {
-			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", description))
+			shortDescription := ellipsisString(description, 500)
+			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
 			sendErr = tg.SendMessage(msg, internal.TelegramMessageOptions{LinkPreview: false})
 		} else {
-			shortDescription := ellipsisString(description, 800)
+			shortDescription := ellipsisString(description, 500)
 			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
 			sendErr = tg.SendPhoto(msg, item.Image.URL)
 		}
