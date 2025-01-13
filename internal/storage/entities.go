@@ -9,7 +9,3 @@ type StoredFeed struct {
 	LastChecked time.Time
 	LastPosted  time.Time
 }
-
-type UpsertFeed struct {
-	URL string
-}

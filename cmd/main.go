@@ -3,34 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"html"
 	"log"
-	"strings"
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"rssgram/internal/utils"
-
-	"github.com/microcosm-cc/bluemonday"
-	"github.com/mmcdole/gofeed"
-	"go.uber.org/zap"
-
 	"rssgram/internal"
-)
+	"rssgram/internal/feed"
+	"rssgram/internal/outputs/telegram"
+	"rssgram/internal/storage/sqlite"
 
-// читаем фиды из конфига
-// синхронизируем их с базой (Storage)
-// поднимаем из базы значения прошлой прошлой проверки и т.д. (FileStorage)
-// проверяем для каких фидов уже подошел интервал (FeedFilter)
-// если интервал еще не подошел - пропускаем (FeedFilter)
-// если подошел: (FeedFilter)
-// - получаем все фиды (FeedFiller)
-// - определяем, есть ли там новые посты
-// - собираем все посты из фидов с одинаковым KEY
-// 		- дедуплицируем одинаковые посты - должен остаться только один пост прикрепленный к какому-то фиду
-// - передаем на отправку (Sender)
-//		- если тип LIST, то новые посты отправляем просто списком
-//		- если SINGLE, то каждый пост отправляется отдельно
+	"go.uber.org/zap"
+)
 
 func main() {
 
@@ -44,283 +29,107 @@ func main() {
 		logger.Fatal(err.Error())
 	}
 
-	tg := internal.NewTelegramChannelClient(cnf)
-
-	storage, err := internal.NewSQLiteStorage()
+	storage, err := sqlite.NewStorage()
 	if err != nil {
-		logger.Fatal(err.Error())
+		log.Fatal(err)
 	}
 
-	// синхронизируем конфиг с базой
-	feeds, err := PrepareFeeds(cnf, storage, logger)
-	if err != nil {
-		logger.Fatal(err.Error())
-	}
+	ctx := context.Background()
 
-	feeds, err = FilterFeedsByInterval(feeds, time.Now().UTC())
-	if err != nil {
-		logger.Fatal(err.Error())
-	}
+	go feedGetter(ctx, cnf, storage, logger.With(zap.String("module", "feed_manager")))
+	go itemSender(ctx, cnf, storage, logger.With(zap.String("module", "sender")))
 
-	logger.Debug(fmt.Sprintf("%d feeds needs to update", len(feeds)))
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+	logger.Info(fmt.Sprintf("received signal %s", s.String()))
 
-	wg := &sync.WaitGroup{}
-
-	for i := range feeds {
-		wg.Add(1)
-
-		go func() {
-			ctxLogger := logger.With(zap.String("feed", feeds[i].FeedConfig.URL))
-			defer func() {
-				ctxLogger.Debug("finish processing")
-				wg.Done()
-			}()
-
-			ctxLogger.Debug("start to processing feed")
-
-			err = FillFeed(&feeds[i])
-			if err != nil {
-				ctxLogger.Error("failed to fill feed", zap.Error(err))
-				return
-			}
-
-			newItems, newLastPosted := FilterFeedItemsByLastPosted(feeds[i].Feed.Items, feeds[i].LastPosted)
-			feeds[i].Feed.Items = newItems
-
-			ctxLogger.Debug(fmt.Sprintf("found %d new items", len(newItems)))
-
-			FillFeedItems(&feeds[i])
-
-			if !feeds[i].IsNew {
-				logger.Debug("start to send messages")
-				var sendErr error
-				if feeds[i].Type == "list" || (feeds[i].Type == "" && len(newItems) > 5) {
-					sendErr = SendFeedList(&feeds[i], tg)
-				} else {
-					sendErr = SendFeedPost(&feeds[i], tg)
-				}
-
-				if sendErr != nil {
-					ctxLogger.Error("failed to send feed", zap.Error(sendErr))
-					return
-				}
-
-			}
-
-			err = storage.UpsertFeed(feeds[i].FeedConfig.URL, time.Now(), newLastPosted)
-			if err != nil {
-				ctxLogger.Error("failed to update feed in db", zap.Error(err))
-			}
-		}()
-	}
-
-	wg.Wait()
-
-	return
 }
 
-func PrepareFeeds(cnf *internal.Config, storage *internal.SQLiteStorage, log *zap.Logger) ([]internal.CommonFeed, error) {
-	var feeds []internal.CommonFeed
-	storedFeeds, err := storage.GetAllFeeds()
-	if err != nil {
-		return nil, fmt.Errorf("error getting all feeds: %w", err)
-	}
+func feedGetter(ctx context.Context, cnf *internal.Config, storage *sqlite.Storage, logger *zap.Logger) {
+	ticker := time.NewTicker(1 * time.Millisecond)
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-	log.Debug(fmt.Sprintf("Found %d feeds in config", len(cnf.Feeds)))
-	log.Debug(fmt.Sprintf("Found %d feeds in database", len(storedFeeds)))
-
-	storedFeedMap := make(map[string]*internal.StoredFeed)
-	for _, feed := range storedFeeds {
-		storedFeedMap[feed.URL] = &feed
-	}
-
-	configFeedMap := make(map[string]*internal.FeedConfig)
-	for _, cf := range cnf.Feeds {
-		configFeedMap[cf.URL] = &cf
-
-		if _, ok := storedFeedMap[cf.URL]; !ok {
-			log.Debug(fmt.Sprintf("Adding feed %s to database", cf.URL))
-			err = storage.UpsertFeed(cf.URL, time.Time{}, time.Time{})
-			if err != nil {
-				return nil, fmt.Errorf("error upserting feed %s: %w", cf.URL, err)
-			}
-			storedFeedMap[cf.URL] = &internal.StoredFeed{URL: cf.URL, LastChecked: time.Time{}, LastPosted: time.Time{}, IsNew: true}
-			log.Debug("success")
+		case <-ticker.C:
+			ticker.Stop()
+			_feedGetter(ctx, cnf, storage, logger)
+			ticker.Reset(10 * time.Second)
 		}
-	}
 
-	for _, feed := range storedFeeds {
-		if _, ok := configFeedMap[feed.URL]; !ok {
-			log.Debug(fmt.Sprintf("Delete feed %s from database", feed.URL))
-			err = storage.DeleteFeed(feed.URL)
-			delete(storedFeedMap, feed.URL)
-			if err != nil {
-				return nil, fmt.Errorf("error deleting feed %s: %w", feed.URL, err)
-			}
-			log.Debug("success")
-		}
 	}
-
-	for _, cf := range cnf.Feeds {
-		feeds = append(feeds, internal.CommonFeed{
-			StoredFeed: *storedFeedMap[cf.URL],
-			FeedConfig: cf,
-		})
-	}
-
-	return feeds, nil
 }
 
-func FilterFeedsByInterval(feeds []internal.CommonFeed, refTime time.Time) ([]internal.CommonFeed, error) {
-	var resultFeeds []internal.CommonFeed
-	for _, feed := range feeds {
-		interval, err := feed.GetInterval()
+func _feedGetter(ctx context.Context, cnf *internal.Config, storage *sqlite.Storage, logger *zap.Logger) {
+	m := feed.NewManager(storage)
+
+	for _, f := range cnf.Feeds {
+		// временный перегон из старого ConfigFeed.
+		fc := feed.FeedConfig{
+			Name:            f.Name,
+			URL:             f.URL,
+			Key:             f.Key,
+			DescriptionType: f.DescriptionType,
+		}
+
+		err := m.ProcessFeed(context.Background(), fc, logger)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get feed interval: %w", err)
-		}
-		if feed.LastChecked.Add(interval).Before(refTime) {
-			resultFeeds = append(resultFeeds, feed)
+			logger.Error("failed to process feed", zap.String("url", f.URL), zap.Error(err))
+			continue
 		}
 	}
-
-	return resultFeeds, nil
 }
 
-func FilterFeedItemsByLastPosted(items []*gofeed.Item, lastPosted time.Time) ([]*gofeed.Item, time.Time) {
-	var resultItems []*gofeed.Item
-	maxLastPosted := lastPosted
+func itemSender(ctx context.Context, cnf *internal.Config, storage *sqlite.Storage, logger *zap.Logger) {
+	ticker := time.NewTicker(1 * time.Millisecond)
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-	for _, item := range items {
-		if item.PublishedParsed.Compare(lastPosted) > 0 {
-			resultItems = append(resultItems, item)
-			if item.PublishedParsed.Compare(maxLastPosted) > 0 {
-				maxLastPosted = *item.PublishedParsed
-			}
+		case <-ticker.C:
+			ticker.Stop()
+			_itemSender(ctx, cnf, storage, logger)
+			ticker.Reset(10 * time.Second)
 		}
-	}
 
-	return resultItems, maxLastPosted
+	}
 }
 
-func FillFeed(f *internal.CommonFeed) error {
-	fp := gofeed.NewParser()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	respFeed, err := fp.ParseURLWithContext(f.FeedConfig.URL, ctx)
-	cancel() // to defer?
+func _itemSender(ctx context.Context, cnf *internal.Config, storage *sqlite.Storage, logger *zap.Logger) {
+	tgOutput := telegram.NewTelegramChannelOutput(
+		cnf.Telegram,
+		logger,
+	)
+	itemsToSend, err := storage.GetItemsReadyToSend(ctx, 2)
 	if err != nil {
-		return err
+		logger.Error("failed to get items to send", zap.Error(err))
 	}
 
-	f.Feed = respFeed
-	return nil
-}
+	logger.Debug(fmt.Sprintf("got %d items to send", len(itemsToSend)))
+	for i := range itemsToSend {
+		logger.Debug(fmt.Sprintf("sending %s ...", itemsToSend[i].ID))
 
-func FillFeedItems(f *internal.CommonFeed) {
-	if f.IsNew {
-		// для только что добавленых фидов нам не надо обрабатывать айтемы
-		return
-	}
-	if f.FeedConfig.DescriptionType == "link" {
-		for i := range f.Feed.Items {
-			url := f.Feed.Items[i].Link
-			p := internal.SiteParser{}
-			siteDescription, err := p.GetDescription(url)
-			if err != nil {
-				continue
-			}
-
-			if siteDescription.Description != "" {
-				f.Feed.Items[i].Description = siteDescription.Description
-			} else if siteDescription.Title != "" {
-				f.Feed.Items[i].Description = siteDescription.Title
-			}
-
-			if siteDescription.Image != "" {
-				im := gofeed.Image{
-					URL:   siteDescription.Image,
-					Title: "",
-				}
-
-				f.Feed.Items[i].Image = &im
-			}
-		}
-	}
-}
-
-func SendFeedList(f *internal.CommonFeed, tg *internal.TelegramChannelClient) error {
-
-	s := MessageSlicer{}
-	messages, _ := s.SliceFeed(f.Feed)
-	for _, m := range messages {
-		err := tg.SendMessage(m, internal.TelegramMessageOptions{LinkPreview: false})
+		pushCtx := context.WithValue(ctx, "item_id", itemsToSend[i].ID)
+		isSuccess, err := tgOutput.Push(pushCtx, &itemsToSend[i])
 		if err != nil {
-			log.Fatalf("error sending message to telegram channel: %v", err)
+			logger.Error("failed to send item", zap.Error(err))
+			continue
 		}
-	}
-
-	return nil
-}
-
-func SendFeedPost(f *internal.CommonFeed, tg *internal.TelegramChannelClient) error {
-	for _, item := range f.Feed.Items {
-		time.Sleep(5 * time.Second)
-		feedTitle := fmt.Sprintf("<b>[%s]</b>", f.Name)
-		itemTitle := fmt.Sprintf("<a href=\"%s\">%s</a>", item.Link, html.EscapeString(item.Title))
-
-		p := bluemonday.StripTagsPolicy()
-
-		description := fmt.Sprintf("%s", p.Sanitize(item.Description))
-
-		var sendErr error
-		if item.Image == nil || item.Image.URL == "" {
-			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", description))
-			sendErr = tg.SendMessage(msg, internal.TelegramMessageOptions{LinkPreview: false})
-		} else {
-			shortDescription := utils.EllipsisString(description, 800)
-			msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
-			sendErr = tg.SendPhoto(msg, item.Image.URL)
+		if !isSuccess {
+			logger.Error("failed to send item")
+			continue
 		}
 
-		if sendErr != nil {
-			log.Fatalf("error sending message to telegram channel: %v", sendErr)
+		err = storage.SetItemIsSent(ctx, itemsToSend[i].ID)
+		if err != nil {
+			logger.Error("failed to set is_sent for item", zap.Error(err))
+			continue
 		}
+		logger.Debug("sent")
+
 	}
 
-	return nil
-}
-
-// move to telegram output
-var msgThreshhold = 4000
-
-type MessageSlicer struct{}
-
-func (s MessageSlicer) SliceFeed(f *gofeed.Feed) ([]string, error) {
-	var msgSlices []string
-
-	title := fmt.Sprintf("<b>[%s]</b>", f.Title)
-	entries := []string{}
-	size := 0
-	size2 := 0
-
-	for _, i := range f.Items {
-		itemLink := fmt.Sprintf("<a href=\"%s\">%s</a>", i.Link, html.EscapeString(i.Title))
-		if size+len(i.Title) > msgThreshhold || size2+len(i.Link) > 9000 {
-			msgSlices = append(msgSlices, fmt.Sprintf("%s\n\n%s", title, strings.Join(entries, "\n")))
-			entries = []string{}
-			size = 0
-			size2 = 0
-		}
-
-		entries = append(entries, itemLink)
-		size += len(i.Title)
-		size2 += len(i.Link)
-	}
-
-	if len(entries) > 0 {
-		msgSlices = append(msgSlices, fmt.Sprintf("%s\n\n%s", title, strings.Join(entries, "\n")))
-	}
-
-	//fmt.Printf("\n\n\n %s \n\n\n", msgSlices)
-
-	return msgSlices, nil
 }

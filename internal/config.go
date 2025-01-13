@@ -3,6 +3,8 @@ package internal
 import (
 	"os"
 
+	"rssgram/internal/outputs/telegram"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,15 +17,9 @@ type FeedConfig struct {
 	DescriptionType string `yaml:"description_type"`
 }
 
-type TelegramConfig struct {
-	Name          string `yaml:"name"`
-	Token         string `yaml:"token"`
-	ListThreshold int    `yaml:"list_threshold"`
-}
-
 type Config struct {
-	Feeds    []FeedConfig     `yaml:"feeds"`
-	Telegram []TelegramConfig `yaml:"telegram"`
+	Feeds    []FeedConfig                         `yaml:"feeds"`
+	Telegram telegram.TelegramChannelOutputConfig `yaml:"telegram"`
 }
 
 func ParseConfig() (*Config, error) {

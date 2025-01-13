@@ -1,10 +1,11 @@
-package internal
+package feed
 
 import (
 	"fmt"
 	"math/rand/v2"
 	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	"golang.org/x/net/html"
@@ -81,6 +82,11 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		}
 	}
 
+	result := SiteDescription{
+		Title:       title,
+		Description: description,
+	}
+
 	// get image
 	regularImageItem := dom.QuerySelector(doc, "meta[name=image]")
 	if regularImageItem != nil {
@@ -94,11 +100,11 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		}
 	}
 
-	return SiteDescription{
-		title,
-		description,
-		image,
-	}, nil
+	if strings.HasPrefix(image, "http") || strings.HasPrefix(image, "https") {
+		result.Image = image
+	}
+
+	return result, nil
 }
 
 // https://xnacly.me/posts/2024/extract-metadata-from-html/
