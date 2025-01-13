@@ -1,11 +1,14 @@
 [Unit]
-Description=rssgram oneshot
+Description=rssgram
 After=network.target
 
 [Service]
-Type=oneshot
+Type=simple
 WorkingDirectory=/opt/rssgram/
-ExecStart=/opt/rssgram/main
+ExecStart=/opt/rssgram/rssgram
+
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

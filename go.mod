@@ -3,7 +3,9 @@ module rssgram
 go 1.23
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c
+	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/mmcdole/gofeed v1.3.0
