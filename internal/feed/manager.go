@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"rssgram/internal/metrics"
 	"rssgram/internal/storage"
 	"rssgram/internal/utils"
 
@@ -77,21 +78,29 @@ func (fm *Manager) ProcessFeed(ctx context.Context, f FeedConfig, logger *zap.Lo
 		ctxLogger.Info("feed is new")
 	}
 
+	startTime := time.Now()
 	feed, err := fm.GetFeed(ctx, f)
 	if err != nil {
+		metrics.FeedGetError.WithLabelValues(f.Name).Inc()
 		return fmt.Errorf("failed get feed by url %s: %w", f.URL, err)
 	}
 
+	metrics.FeedGetTimeSec.WithLabelValues(f.Name).Observe(time.Since(startTime).Seconds())
+	metrics.FeedGetSuccess.WithLabelValues(f.Name).Inc()
+
 	var lastItemPublishedAt time.Time
+	var newItems int
 
 	if isNewFeed {
 		lastItemPublishedAt = fm.getMaxPublishedAt(feed)
 	} else {
 		feed.StoredLastSavedItem = storedFeed.LastPosted
-		_, lastItemPublishedAt, err = fm.processFeed(ctx, feed, ctxLogger)
+		newItems, lastItemPublishedAt, err = fm.processFeed(ctx, feed, ctxLogger)
 		if err != nil {
 			return fmt.Errorf("failed process feed %s: %w", f.URL, err)
 		}
+
+		metrics.NewItemsCount.WithLabelValues(feed.Title).Add(float64(newItems))
 	}
 
 	err = fm.repo.UpsertFeed(ctx, f.URL, time.Now().UTC(), lastItemPublishedAt)
@@ -114,9 +123,12 @@ func (fm *Manager) processFeed(ctx context.Context, feed *Feed, ctxLogger *zap.L
 	newItemsAmount = fm.filterItemsAfterByRefTime(feed, feed.StoredLastSavedItem)
 	ctxLogger.Debug(fmt.Sprintf("new items: %d", newItemsAmount))
 
+	startTime := time.Now()
 	if err := fm.EnrichFeedItems(feed); err != nil {
 		return newItemsAmount, lastItemPublishedAt, fmt.Errorf("failed enriching feed items (%s): %w", feed.URL, err)
 	}
+
+	metrics.ItemsEnrichTimeSec.WithLabelValues(feed.Title).Observe(time.Since(startTime).Seconds())
 
 	for i := range feed.Items {
 		err := fm.repo.InsertItem(context.Background(), &feed.Items[i])
