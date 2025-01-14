@@ -129,6 +129,30 @@ func (s *Storage) GetItemsReadyToSend(ctx context.Context, limit int) ([]feed.Fe
 	return items, nil
 }
 
+func (s *Storage) GetCountItemsReadyToSend(ctx context.Context) (int, error) {
+	count := 0
+
+	stmt := "SELECT count(id) FROM items where is_sent = 0"
+	rows, err := s.db.Query(stmt)
+	if err != nil {
+		return count, fmt.Errorf("failed to fetch count ready items: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		err = rows.Scan(&count)
+		if err != nil {
+			return count, fmt.Errorf("failed to fetch all feeds: %w", err)
+		}
+
+		return count, nil
+	}
+
+	return count, nil
+}
+
 func (s *Storage) SetItemIsSent(ctx context.Context, itemID string) error {
 	stmt := `UPDATE items SET is_sent = 1, sent_at = ? WHERE id=?`
 	_, err := s.db.Exec(stmt, time.Now().UTC().Format(time.DateTime), itemID)
