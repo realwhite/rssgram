@@ -23,37 +23,54 @@ type TelegramChannelOutput struct {
 	config TelegramChannelOutputConfig
 }
 
-func (o *TelegramChannelOutput) isSilentMode() (bool, error) {
-	if o.config.SilentMode.Start != "" && o.config.SilentMode.Finish != "" {
-		startTime, err := time.Parse(time.TimeOnly, o.config.SilentMode.Start)
-		if err != nil {
-			return false, fmt.Errorf("error parsing start time: %w", err)
-		}
+func (o *TelegramChannelOutput) IsSilentMode(startTimeStr, finishTimeStr, tzStr string, refTime time.Time) (bool, error) {
 
-		finishTime, err := time.Parse(time.TimeOnly, o.config.SilentMode.Finish)
-		if err != nil {
-			return false, fmt.Errorf("error parsing finish time: %w", err)
-		}
+	if startTimeStr == "" || finishTimeStr == "" {
+		return false, nil
+	}
 
-		loc, err := time.LoadLocation(o.config.SilentMode.Timezone)
-		if err != nil {
-			return false, fmt.Errorf("error loading location: %w", err)
-		}
+	startTime, err := time.Parse(time.TimeOnly, startTimeStr)
+	if err != nil {
+		return false, fmt.Errorf("error parsing start time: %w", err)
+	}
 
-		now := time.Now().In(loc)
-		daysDelta := 0
+	finishTime, err := time.Parse(time.TimeOnly, finishTimeStr)
+	if err != nil {
+		return false, fmt.Errorf("error parsing finish time: %w", err)
+	}
 
-		startDateTime := time.Date(now.Year(), now.Month(), now.Day(), startTime.Hour(), startTime.Minute(), 0, 0, loc)
+	loc, err := time.LoadLocation(tzStr)
+	if err != nil {
+		return false, fmt.Errorf("error loading location: %w", err)
+	}
 
-		if finishTime.Hour() < startTime.Hour() {
-			daysDelta = 1
-		}
+	refTime = refTime.In(loc)
 
-		finishDateTime := time.Date(now.Year(), now.Month(), now.Day()+daysDelta, finishTime.Hour(), finishTime.Minute(), 0, 0, loc)
+	crossNight := false
 
-		if now.After(startDateTime) && now.Before(finishDateTime) {
+	if finishTime.Hour() <= startTime.Hour() {
+		crossNight = true
+	}
+
+	if !crossNight {
+		startDateTime := time.Date(refTime.Year(), refTime.Month(), refTime.Day(), startTime.Hour(), startTime.Minute(), 0, 0, loc)
+		finishDateTime := time.Date(refTime.Year(), refTime.Month(), refTime.Day(), finishTime.Hour(), finishTime.Minute(), 0, 0, loc)
+
+		fmt.Println(refTime.After(startDateTime))
+		fmt.Println(refTime.Before(finishDateTime))
+
+		if startDateTime.Before(refTime) && finishDateTime.After(refTime) {
 			return true, nil
 		}
+		return false, nil
+	}
+
+	if refTime.Hour() < finishTime.Hour() && refTime.Minute() <= finishTime.Minute() {
+		return true, nil
+	}
+
+	if refTime.Hour() >= startTime.Hour() && refTime.Minute() >= startTime.Minute() {
+		return true, nil
 	}
 
 	return false, nil
@@ -62,7 +79,12 @@ func (o *TelegramChannelOutput) isSilentMode() (bool, error) {
 
 func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (bool, error) {
 
-	disableNotification, err := o.isSilentMode()
+	disableNotification, err := o.IsSilentMode(
+		o.config.SilentMode.Start,
+		o.config.SilentMode.Finish,
+		o.config.SilentMode.Timezone,
+		time.Now(),
+	)
 	if err != nil {
 		return false, fmt.Errorf("error checking silent mode: %w", err)
 	}
