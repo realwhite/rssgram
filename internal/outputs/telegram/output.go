@@ -95,15 +95,24 @@ func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (
 	p := bluemonday.StripTagsPolicy()
 
 	description := fmt.Sprintf("%s", p.Sanitize(item.Description))
+	shortDescription := utils.EllipsisString(description, 800)
+
+	msg := fmt.Sprintf(
+		"%s\n\n%s\n\n%s",
+		feedTitle,
+		itemTitle,
+		fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription),
+	)
 
 	var sendErr error
+
 	if item.ImageURL == "" {
-		shortDescription := utils.EllipsisString(description, 800)
-		msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
-		sendErr = o.client.SendMessage(ctx, msg, TelegramMessageOptions{LinkPreview: false, DisableNotification: disableNotification})
+		sendErr = o.client.SendMessage(
+			ctx,
+			msg,
+			TelegramMessageOptions{LinkPreview: false, DisableNotification: disableNotification},
+		)
 	} else {
-		shortDescription := utils.EllipsisString(description, 800)
-		msg := fmt.Sprintf("%s\n\n%s\n\n%s", feedTitle, itemTitle, fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription))
 		sendErr = o.client.SendPhoto(ctx, msg, item.ImageURL, disableNotification)
 	}
 

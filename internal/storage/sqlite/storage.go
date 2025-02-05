@@ -78,8 +78,8 @@ func (s *Storage) InsertItem(ctx context.Context, item *feed.FeedItem) error {
 	}
 
 	stmt := `
-	INSERT INTO items (id, feed_title, title, link, description, image_url, tags, metadata, published_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO items (id, feed_title, title, link, description, image_url, tags, metadata, published_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO NOTHING
 `
 	_, err = s.db.Exec(stmt,
@@ -92,6 +92,7 @@ func (s *Storage) InsertItem(ctx context.Context, item *feed.FeedItem) error {
 		itemTagsJSON,
 		itemMetaJSON,
 		item.PublishedAt.Format(time.DateTime),
+		time.Now().UTC().Format(time.DateTime),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert item: %w", err)
@@ -100,8 +101,13 @@ func (s *Storage) InsertItem(ctx context.Context, item *feed.FeedItem) error {
 }
 
 func (s *Storage) GetItemsReadyToSend(ctx context.Context, limit int) ([]feed.FeedItem, error) {
-	stmt := "SELECT id, title, feed_title, title, link, image_url, description, published_at, tags, metadata  FROM items where is_sent = 0 order by published_at limit ?"
-	rows, err := s.db.Query(stmt, limit)
+	stmt := "SELECT id, title, feed_title, title, link, image_url, description, published_at, tags, metadata  FROM items where is_sent = 0 order by published_at"
+
+	if limit > 0 {
+		stmt += fmt.Sprintf(" LIMIT %d", limit)
+	}
+
+	rows, err := s.db.Query(stmt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch ready items: %w", err)
 	}
@@ -129,6 +135,30 @@ func (s *Storage) GetItemsReadyToSend(ctx context.Context, limit int) ([]feed.Fe
 	return items, nil
 }
 
+func (s *Storage) GetCountItemsSendFailed(ctx context.Context) (int, error) {
+	count := 0
+
+	stmt := "SELECT count(id) FROM items where is_sent = 0 and failed_count > 0"
+	rows, err := s.db.Query(stmt)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch count items: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		err = rows.Scan(&count)
+		if err != nil {
+			return count, fmt.Errorf("failed to fetch all feeds: %w", err)
+		}
+
+		return count, nil
+	}
+
+	return count, nil
+}
+
 func (s *Storage) GetCountItemsReadyToSend(ctx context.Context) (int, error) {
 	count := 0
 
@@ -154,39 +184,22 @@ func (s *Storage) GetCountItemsReadyToSend(ctx context.Context) (int, error) {
 }
 
 func (s *Storage) SetItemIsSent(ctx context.Context, itemID string) error {
-	stmt := `UPDATE items SET is_sent = 1, sent_at = ? WHERE id=?`
-	_, err := s.db.Exec(stmt, time.Now().UTC().Format(time.DateTime), itemID)
+	stmt := `UPDATE items SET is_sent = 1, sent_at = ?, updated_at = ? WHERE id=?`
+	nowStr := time.Now().UTC().Format(time.DateTime)
+	_, err := s.db.Exec(stmt, nowStr, nowStr, itemID)
 	if err != nil {
 		return fmt.Errorf("failed to update item: %w", err)
 	}
 	return nil
 }
 
-func (s *Storage) init() error {
-	stmt := `
-	CREATE TABLE IF NOT EXISTS feeds (
-		url TEXT NOT NULL PRIMARY KEY, 
-		last_checked TEXT NOT NULL, 
-		last_post TEXT NOT NULL
-	);
-
-	CREATE TABLE IF NOT EXISTS items (
-		id TEXT NOT NULL PRIMARY KEY,
-		feed_title TEXT NOT NULL,
-		title TEXT NOT NULL,
-		link TEXT NOT NULL DEFAULT '',
-		description TEXT NOT NULL,
-		image_url TEXT,
-		tags TEXT NOT NULL DEFAULT '',
-		metadata TEXT NOT NULL DEFAULT '{}',
-		published_at TEXT NOT NULL,
-		is_sent BOOLEAN NOT NULL DEFAULT '0',
-		sent_at TEXT
-	);
-
-`
-	_, err := s.db.Exec(stmt)
-	return err
+func (s *Storage) IncrementItemFailedCounter(ctx context.Context, itemID string) error {
+	stmt := `UPDATE items SET failed_count = failed_count + 1, updated_at = ? where id=?`
+	_, err := s.db.Exec(stmt, time.Now().UTC().Format(time.DateTime), itemID)
+	if err != nil {
+		return fmt.Errorf("failed to update item failed counter: %w", err)
+	}
+	return nil
 }
 
 func NewStorage() (*Storage, error) {
@@ -195,10 +208,5 @@ func NewStorage() (*Storage, error) {
 		return nil, fmt.Errorf("failed to open SQLite storage: %w", err)
 	}
 
-	storage := &Storage{db: db}
-	err = storage.init()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize SQLite storage: %w", err)
-	}
-	return storage, nil
+	return &Storage{db: db}, nil
 }

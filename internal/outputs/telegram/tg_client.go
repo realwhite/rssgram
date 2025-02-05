@@ -4,11 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
 
 	"go.uber.org/zap"
+)
+
+var (
+	ErrTooManyRequests = errors.New("too many requests")
+	ErrBadRequest      = errors.New("bad request")
 )
 
 type LinkPreviewOptions struct {
@@ -152,11 +158,16 @@ func (c *TelegramChannelClient) SendMessage(ctx context.Context, msg string, opt
 	}
 	ctxLogger.Debug("response dump", zap.String("response", string(respDump)))
 
-	if res.StatusCode != http.StatusOK {
+	switch res.StatusCode {
+	case http.StatusTooManyRequests:
+		return ErrTooManyRequests
+	case http.StatusBadRequest:
+		return ErrBadRequest
+	case http.StatusOK:
+		return nil
+	default:
 		return fmt.Errorf("return status code: %d", res.StatusCode)
 	}
-
-	return nil
 }
 
 func NewTelegramChannelClient(conf TelegramChannelClientConfig, logger *zap.Logger) *TelegramChannelClient {

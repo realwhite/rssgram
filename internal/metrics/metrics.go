@@ -25,6 +25,11 @@ var ItemsReadyToSendCount = promauto.NewGauge(prometheus.GaugeOpts{
 	Name:      "items_ready_to_send_count",
 })
 
+var ItemsSentFailedCount = promauto.NewGauge(prometheus.GaugeOpts{
+	Namespace: metricNamespace,
+	Name:      "items_sent_failed_count",
+})
+
 var ItemsSentSuccessCount = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Namespace: metricNamespace,

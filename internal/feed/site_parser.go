@@ -24,21 +24,23 @@ type SiteDescription struct {
 }
 
 type SiteParser struct {
+	client *http.Client
+}
+
+func (p *SiteParser) setUA(req *http.Request) {
+	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
 }
 
 func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
-	client := http.Client{
-		Timeout: time.Second * 5,
-	}
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return SiteDescription{}, fmt.Errorf("failed to  create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
+	p.setUA(req)
 
-	resp, err := client.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return SiteDescription{}, fmt.Errorf("failed to get content by url %s: %w", url, err)
 	} else if resp.StatusCode > http.StatusPermanentRedirect {
@@ -100,15 +102,76 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		}
 	}
 
-	if strings.HasPrefix(image, "http") || strings.HasPrefix(image, "https") {
-		result.Image = image
+	if image != "" {
+		isValid, _ := p.isImageURLValid(image)
+
+		if isValid {
+			result.Image = image
+		}
+
 	}
 
 	return result, nil
 }
 
+func (p *SiteParser) isImageURLValid(url string) (bool, error) {
+	if !strings.HasPrefix(url, "http") && !strings.HasPrefix(url, "https") {
+		return false, nil
+	}
+
+	_, mimeType, err := p.getMimeTypeByUrl(url)
+	if err != nil {
+		return false, fmt.Errorf("failed to get content by url %s: %w", url, err)
+	}
+
+	if strings.Contains(mimeType, "image") {
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
+func (p *SiteParser) makeReq(method, url string) (int, string, error) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return 0, "", err
+	}
+
+	p.setUA(req)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return 0, "", err
+	}
+
+	defer resp.Body.Close()
+
+	return resp.StatusCode, resp.Header.Get("Content-Type"), err
+}
+
+func (p *SiteParser) getMimeTypeByUrl(url string) (int, string, error) {
+	statusCode, contType, err := p.makeReq(http.MethodHead, url)
+	if err != nil {
+		return statusCode, "", err
+	}
+
+	if statusCode == 405 {
+		statusCode, contType, err = p.makeReq(http.MethodGet, url)
+		if err != nil {
+			return statusCode, contType, err
+		}
+	}
+	return statusCode, contType, err
+}
+
 // https://xnacly.me/posts/2024/extract-metadata-from-html/
 
 func NewSiteParser() *SiteParser {
-	return &SiteParser{}
+	client := http.Client{
+		Timeout: time.Second * 5,
+	}
+	return &SiteParser{
+		client: &client,
+	}
 }
