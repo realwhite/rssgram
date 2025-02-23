@@ -45,36 +45,23 @@ func (o *TelegramChannelOutput) IsSilentMode(startTimeStr, finishTimeStr, tzStr 
 	}
 
 	refTime = refTime.In(loc)
+	onlyRefTime := time.Date(startTime.Year(), startTime.Month(), startTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), loc)
 
-	crossNight := false
-
-	if finishTime.Hour() <= startTime.Hour() {
-		crossNight = true
-	}
-
-	if !crossNight {
-		startDateTime := time.Date(refTime.Year(), refTime.Month(), refTime.Day(), startTime.Hour(), startTime.Minute(), 0, 0, loc)
-		finishDateTime := time.Date(refTime.Year(), refTime.Month(), refTime.Day(), finishTime.Hour(), finishTime.Minute(), 0, 0, loc)
-
-		fmt.Println(refTime.After(startDateTime))
-		fmt.Println(refTime.Before(finishDateTime))
-
-		if startDateTime.Before(refTime) && finishDateTime.After(refTime) {
+	if finishTime.After(startTime) {
+		// one day
+		if onlyRefTime.After(startTime) && onlyRefTime.Before(finishTime) {
 			return true, nil
 		}
 		return false, nil
-	}
-
-	if refTime.Hour() < finishTime.Hour() && refTime.Minute() <= finishTime.Minute() {
+	} else if finishTime.Before(startTime) {
+		// crossday
+		if onlyRefTime.After(finishTime) && onlyRefTime.Before(startTime) {
+			return false, nil
+		}
 		return true, nil
 	}
 
-	if refTime.Hour() >= startTime.Hour() && refTime.Minute() >= startTime.Minute() {
-		return true, nil
-	}
-
-	return false, nil
-
+	return true, nil
 }
 
 func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (bool, error) {

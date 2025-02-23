@@ -135,14 +135,24 @@ func TestTelegramChannelOutput_IsSilentMode(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "silent in two days (false)",
+			name: "silent in two days (true)",
+			silentConfig: SilentModeConfig{
+				Start:    "23:00:00",
+				Finish:   "06:00:00",
+				Timezone: "",
+			},
+			refTime:  time.Date(2025, 10, 17, 5, 59, 59, 0, time.UTC),
+			expected: true,
+		},
+		{
+			name: "silent in two days (true)",
 			silentConfig: SilentModeConfig{
 				Start:    "23:00:00",
 				Finish:   "06:00:00",
 				Timezone: "",
 			},
 			refTime:  time.Date(2025, 10, 17, 6, 0, 0, 0, time.UTC),
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "silent in two days (false)",
@@ -153,6 +163,16 @@ func TestTelegramChannelOutput_IsSilentMode(t *testing.T) {
 			},
 			refTime:  time.Date(2025, 10, 17, 6, 0, 1, 0, time.UTC),
 			expected: false,
+		},
+		{
+			name: "edge1",
+			silentConfig: SilentModeConfig{
+				Start:    "23:00:00",
+				Finish:   "06:00:00",
+				Timezone: "",
+			},
+			refTime:  time.Date(2025, 10, 17, 0, 50, 1, 0, time.UTC),
+			expected: true,
 		},
 	}
 
