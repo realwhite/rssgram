@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/syslog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,7 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 //go:embed migrations/*.sql
@@ -33,7 +34,10 @@ var migrations embed.FS
 
 func runMigrate() error {
 
-	db, err := sql.Open("sqlite3", "data.db")
+	w, _ := syslog.New(syslog.LOG_SYSLOG|syslog.LOG_INFO, "rssgram")
+	log.SetOutput(w)
+
+	db, err := sql.Open("sqlite", "file:data.db?cache=shared")
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
@@ -49,7 +53,7 @@ func runMigrate() error {
 		return fmt.Errorf("failed to init iofs: %w", err)
 	}
 
-	m, err := migrate.NewWithInstance("iofs", d, "sqlite3", instance)
+	m, err := migrate.NewWithInstance("iofs", d, "sqlite", instance)
 	if err != nil {
 		return fmt.Errorf("failed to init migrate: %w", err)
 	}
