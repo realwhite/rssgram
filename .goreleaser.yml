@@ -1,0 +1,12 @@
+builds:
+  - dir: ./cmd  # Путь к основному пакету
+    main: .           # Если main.go находится в ./cmd/myapp
+    binary: rssgramm     # Имя выходного бинарника
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
