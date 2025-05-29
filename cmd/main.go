@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/syslog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,6 +33,9 @@ import (
 var migrations embed.FS
 
 func runMigrate() error {
+
+	w, _ := syslog.New(syslog.LOG_SYSLOG|syslog.LOG_INFO, "rssgram")
+	log.SetOutput(w)
 
 	db, err := sql.Open("sqlite3", "data.db")
 	if err != nil {

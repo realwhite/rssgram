@@ -1,0 +1,19 @@
+telegram:
+  channel_name: "@posting_test_channel"
+  bot_token: "<TG_TOKEN>"
+  silent_mode:
+    start: "23:00:00"
+    finish: "08:00:00"
+    timezone: "Europe/Moscow"
+
+feeds:
+  - name: Hacker News
+    url: https://news.ycombinator.com/rss
+    description_type: link # item, link, none. default - item
+
+  - name: "Opennet: главные новости"
+    url: https://www.opennet.ru/opennews/opennews_all_noadv.rss
+
+  - name: "YT: Phil's Lab"
+    url: https://youtube.com/feeds/videos.xml?channel_id=UCVryWqJ4cSlbTSETBHpBUWw
+    description_type: link
