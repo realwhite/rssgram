@@ -9,7 +9,7 @@ import (
 	"rssgram/internal/feed"
 	"rssgram/internal/storage"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type Storage struct {
@@ -203,7 +203,7 @@ func (s *Storage) IncrementItemFailedCounter(ctx context.Context, itemID string)
 }
 
 func NewStorage() (*Storage, error) {
-	db, err := sql.Open("sqlite3", "data.db")
+	db, err := sql.Open("sqlite", "file:data.db?cache=shared")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open SQLite storage: %w", err)
 	}
