@@ -73,9 +73,9 @@ func NewFeedItem(feedTitle, title, link, imageURL, description string, published
 }
 
 type FeedConfig struct {
-	Name            string   `json:"name"`
-	URL             string   `json:"url"`
-	Key             string   `json:"key"`
-	DescriptionType string   `json:"description_type"`
-	Tags            []string `json:"tags"`
+	Name            string   `json:"name" yaml:"name"`
+	URL             string   `json:"url" yaml:"url"`
+	Key             string   `json:"key" yaml:"key"`
+	DescriptionType string   `json:"description_type" yaml:"description_type"`
+	Tags            []string `json:"tags" yaml:"tags"`
 }

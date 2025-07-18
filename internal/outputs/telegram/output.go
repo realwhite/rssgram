@@ -18,9 +18,10 @@ type TelegramChannelOutputConfig struct {
 }
 
 type TelegramChannelOutput struct {
-	client *TelegramChannelClient
+	client TelegramClient
 
-	config TelegramChannelOutputConfig
+	config     TelegramChannelOutputConfig
+	enableTags bool
 }
 
 func (o *TelegramChannelOutput) IsSilentMode(startTimeStr, finishTimeStr, tzStr string, refTime time.Time) (bool, error) {
@@ -91,6 +92,16 @@ func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (
 		fmt.Sprintf("<blockquote>%s</blockquote>", shortDescription),
 	)
 
+	// Добавляем теги, если включено
+	if o.enableTags && len(item.Tags) > 0 {
+		tags := ""
+		for _, tag := range item.Tags {
+			tags += "#" + tag + " "
+		}
+		tags = tags[:len(tags)-1] // убрать последний пробел
+		msg += "\n\n" + tags
+	}
+
 	var sendErr error
 
 	if item.ImageURL == "" {
@@ -110,9 +121,17 @@ func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (
 	return true, nil
 }
 
-func NewTelegramChannelOutput(conf TelegramChannelOutputConfig, logger *zap.Logger) *TelegramChannelOutput {
+func NewTelegramChannelOutput(conf TelegramChannelOutputConfig, logger *zap.Logger, enableTags bool) *TelegramChannelOutput {
 	return &TelegramChannelOutput{
-		config: conf,
-		client: NewTelegramChannelClient(conf.TelegramChannelClientConfig, logger),
+		config:     conf,
+		client:     TelegramClient(NewTelegramChannelClient(conf.TelegramChannelClientConfig, logger)),
+		enableTags: enableTags,
 	}
+}
+
+// Интерфейс для клиента Telegram
+
+type TelegramClient interface {
+	SendMessage(ctx context.Context, msg string, options TelegramMessageOptions) error
+	SendPhoto(ctx context.Context, msg, photoUrl string, disableNotification bool) error
 }

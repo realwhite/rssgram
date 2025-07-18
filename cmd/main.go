@@ -158,6 +158,7 @@ func _itemSender(ctx context.Context, cnf *internal.Config, storage *sqlite.Stor
 	tgOutput := telegram.NewTelegramChannelOutput(
 		cnf.Telegram,
 		logger,
+		cnf.EnableTags,
 	)
 
 	itemsToSend, err := storage.GetItemsReadyToSend(ctx, 0)

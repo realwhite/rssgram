@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -39,6 +40,7 @@ func (m *MockRepo) InsertItem(ctx context.Context, item *FeedItem) error {
 	return args.Error(0)
 }
 
+// TestNewManager проверяет, что менеджер создаётся корректно и содержит переданный repo.
 func TestNewManager(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -47,6 +49,7 @@ func TestNewManager(t *testing.T) {
 	assert.Equal(t, mockRepo, manager.repo)
 }
 
+// TestManager_GetMaxPublishedAt проверяет корректность поиска самой поздней даты публикации среди элементов фида.
 func TestManager_GetMaxPublishedAt(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -108,6 +111,7 @@ func TestManager_GetMaxPublishedAt(t *testing.T) {
 	}
 }
 
+// TestManager_FilterItemsAfterByRefTime проверяет фильтрацию элементов фида по дате публикации относительно заданного времени.
 func TestManager_FilterItemsAfterByRefTime(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -211,6 +215,7 @@ func TestManager_FilterItemsAfterByRefTime(t *testing.T) {
 	}
 }
 
+// TestManager_ProcessFeed_NewFeed проверяет обработку нового фида (когда его ещё нет в хранилище).
 func TestManager_ProcessFeed_NewFeed(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -232,6 +237,7 @@ func TestManager_ProcessFeed_NewFeed(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed get feed by url")
 }
 
+// TestManager_ProcessFeed_ExistingFeed проверяет обработку уже существующего фида (есть в хранилище).
 func TestManager_ProcessFeed_ExistingFeed(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -259,6 +265,7 @@ func TestManager_ProcessFeed_ExistingFeed(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed get feed by url")
 }
 
+// TestManager_ProcessFeed_StorageError проверяет обработку ошибки при получении фида из хранилища.
 func TestManager_ProcessFeed_StorageError(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
@@ -279,6 +286,76 @@ func TestManager_ProcessFeed_StorageError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed get stored feed by url")
 
 	mockRepo.AssertExpectations(t)
+}
+
+// Для теста приоритета тегов
+type fakeItem struct {
+	title      string
+	categories []string
+}
+
+// TestFeedManager_GetFeed_TagsPriority проверяет приоритет тегов: если в конфиге есть теги, используются только они, иначе берутся из RSS.
+func TestFeedManager_GetFeed_TagsPriority(t *testing.T) {
+	mockRepo := &MockRepo{}
+	manager := NewManager(mockRepo)
+
+	feedConfigWithTags := FeedConfig{
+		Name: "TestFeed",
+		URL:  "https://example.com/rss",
+		Tags: []string{"tag1", "tag2"},
+	}
+	feedConfigNoTags := FeedConfig{
+		Name: "TestFeed",
+		URL:  "https://example.com/rss",
+	}
+
+	// Мокаем gofeed.Parser
+	parser := &fakeParser{
+		items: []fakeItem{
+			{"Title1", []string{"rss1", "rss2"}},
+			{"Title2", []string{"cat"}},
+		},
+	}
+
+	// Подменяем parserFactory на фейковый парсер
+	oldFactory := manager.parserFactory
+	manager.parserFactory = func() gofeedParser { return parser }
+	defer func() { manager.parserFactory = oldFactory }()
+
+	ctx := context.Background()
+
+	// 1. Если в конфиге есть теги, используются только они
+	feed, err := manager.GetFeed(ctx, feedConfigWithTags)
+	assert.NoError(t, err)
+	for _, item := range feed.Items {
+		assert.Equal(t, []string{"tag1", "tag2"}, item.Tags)
+	}
+
+	// 2. Если в конфиге нет тегов, используются из RSS
+	feed, err = manager.GetFeed(ctx, feedConfigNoTags)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"rss1", "rss2"}, feed.Items[0].Tags)
+	assert.Equal(t, []string{"cat"}, feed.Items[1].Tags)
+}
+
+// Моки для gofeed
+
+type fakeParser struct {
+	items []fakeItem
+}
+
+func (f *fakeParser) ParseURLWithContext(url string, ctx context.Context) (*gofeed.Feed, error) {
+	var items []*gofeed.Item
+	for _, it := range f.items {
+		items = append(items, &gofeed.Item{
+			Title:      it.title,
+			Categories: it.categories,
+		})
+	}
+	return &gofeed.Feed{
+		Title: "FakeFeed",
+		Items: items,
+	}, nil
 }
 
 // Вспомогательная функция для создания указателя на время

@@ -8,12 +8,16 @@ import (
 
 	"rssgram/internal/metrics"
 	"rssgram/internal/storage"
-	"rssgram/internal/utils"
 
 	"github.com/google/uuid"
 	"github.com/mmcdole/gofeed"
 	"go.uber.org/zap"
 )
+
+// Интерфейс для парсера RSS, чтобы можно было мокать в тестах
+type gofeedParser interface {
+	ParseURLWithContext(url string, ctx context.Context) (*gofeed.Feed, error)
+}
 
 type repo interface {
 	GetFeedByURL(ctx context.Context, url string) (*storage.StoredFeed, error)
@@ -24,7 +28,8 @@ type repo interface {
 }
 
 type Manager struct {
-	repo repo
+	repo          repo
+	parserFactory func() gofeedParser
 }
 
 func (fm *Manager) EnrichFeedItems(feed *Feed) error {
@@ -176,7 +181,7 @@ func (fm *Manager) filterItemsAfterByRefTime(f *Feed, refTime time.Time) int {
 
 func (fm *Manager) GetFeed(ctx context.Context, f FeedConfig) (*Feed, error) {
 
-	fp := gofeed.NewParser()
+	fp := fm.parserFactory()
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
@@ -199,6 +204,13 @@ func (fm *Manager) GetFeed(ctx context.Context, f FeedConfig) (*Feed, error) {
 			imageURL = item.Image.URL
 		}
 
+		var tags []string
+		if len(f.Tags) > 0 {
+			tags = f.Tags
+		} else {
+			tags = item.Categories
+		}
+
 		items = append(items,
 			NewFeedItem(
 				feedTitle,
@@ -208,7 +220,7 @@ func (fm *Manager) GetFeed(ctx context.Context, f FeedConfig) (*Feed, error) {
 				item.Description,
 				item.PublishedParsed,
 				item.UpdatedParsed,
-				utils.MergeStrSlices(item.Categories, f.Tags),
+				tags,
 			))
 	}
 
@@ -229,6 +241,7 @@ func (fm *Manager) GetFeed(ctx context.Context, f FeedConfig) (*Feed, error) {
 
 func NewManager(repo repo) *Manager {
 	return &Manager{
-		repo: repo,
+		repo:          repo,
+		parserFactory: func() gofeedParser { return gofeed.NewParser() },
 	}
 }

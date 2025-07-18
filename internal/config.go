@@ -9,17 +9,19 @@ import (
 )
 
 type FeedConfig struct {
-	Name            string `yaml:"name"`
-	URL             string `yaml:"url"`
-	Type            string `yaml:"type"`
-	Interval        string `yaml:"interval"`
-	Key             string `yaml:"key"`
-	DescriptionType string `yaml:"description_type"`
+	Name            string   `yaml:"name"`
+	URL             string   `yaml:"url"`
+	Type            string   `yaml:"type"`
+	Interval        string   `yaml:"interval"`
+	Key             string   `yaml:"key"`
+	DescriptionType string   `yaml:"description_type"`
+	Tags            []string `yaml:"tags"`
 }
 
 type Config struct {
-	Feeds    []FeedConfig                         `yaml:"feeds"`
-	Telegram telegram.TelegramChannelOutputConfig `yaml:"telegram"`
+	Feeds      []FeedConfig                         `yaml:"feeds"`
+	Telegram   telegram.TelegramChannelOutputConfig `yaml:"telegram"`
+	EnableTags bool                                 `yaml:"enable_tags"`
 }
 
 func ParseConfig() (*Config, error) {

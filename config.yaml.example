@@ -6,13 +6,17 @@ telegram:
     finish: "08:00:00"
     timezone: "Europe/Moscow"
 
+enable_tags: true
+
 feeds:
   - name: Hacker News
     url: https://news.ycombinator.com/rss
     description_type: link # item, link, none. default - item
+    tags: ["it", "news"]
 
   - name: "Opennet: главные новости"
     url: https://www.opennet.ru/opennews/opennews_all_noadv.rss
+    # tags: ["linux", "opensource"]
 
   - name: "YT: Phil's Lab"
     url: https://youtube.com/feeds/videos.xml?channel_id=UCVryWqJ4cSlbTSETBHpBUWw
