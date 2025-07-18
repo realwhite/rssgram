@@ -146,6 +146,9 @@ func (fm *Manager) getMaxPublishedAt(f *Feed) time.Time {
 	var maxPublishedAt time.Time
 
 	for i := range f.Items {
+		if f.Items[i].PublishedAt == nil {
+			continue
+		}
 		if maxPublishedAt.IsZero() {
 			maxPublishedAt = *f.Items[i].PublishedAt
 		} else if maxPublishedAt.Before(*f.Items[i].PublishedAt) {
