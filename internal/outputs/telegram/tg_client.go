@@ -64,8 +64,10 @@ type TelegramChannelClient struct {
 func (c *TelegramChannelClient) SendPhoto(ctx context.Context, msg string, photoUrl string, disableNotification bool) error {
 
 	ctxLogger := c.logger
-	if ctx.Value("item_id") != nil {
-		ctxLogger = c.logger.With(zap.String("item_id", ctx.Value("item_id").(string)))
+	if v := ctx.Value("item_id"); v != nil {
+		if itemID, ok := v.(string); ok {
+			ctxLogger = c.logger.With(zap.String("item_id", itemID))
+		}
 	}
 
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", c.conf.BotToken)
@@ -116,8 +118,10 @@ func (c *TelegramChannelClient) SendPhoto(ctx context.Context, msg string, photo
 
 func (c *TelegramChannelClient) SendMessage(ctx context.Context, msg string, options TelegramMessageOptions) error {
 	ctxLogger := c.logger
-	if ctx.Value("item_id") != nil {
-		ctxLogger = c.logger.With(zap.String("item_id", ctx.Value("item_id").(string)))
+	if v := ctx.Value("item_id"); v != nil {
+		if itemID, ok := v.(string); ok {
+			ctxLogger = c.logger.With(zap.String("item_id", itemID))
+		}
 	}
 
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", c.conf.BotToken)

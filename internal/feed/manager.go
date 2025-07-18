@@ -39,11 +39,11 @@ func (fm *Manager) EnrichFeedItems(feed *Feed) error {
 		item := &feed.Items[i]
 
 		wg.Add(1)
-		go func() {
+		go func(item *FeedItem) {
 			defer wg.Done()
 			siteDescription, err := p.GetDescription(item.Link)
 			if err != nil {
-				//	TODO: LOG
+				// TODO: LOG
 				return
 			}
 
@@ -56,7 +56,7 @@ func (fm *Manager) EnrichFeedItems(feed *Feed) error {
 			if siteDescription.Image != "" {
 				item.ImageURL = siteDescription.Image
 			}
-		}()
+		}(item)
 	}
 
 	wg.Wait()
@@ -146,6 +146,9 @@ func (fm *Manager) getMaxPublishedAt(f *Feed) time.Time {
 	var maxPublishedAt time.Time
 
 	for i := range f.Items {
+		if f.Items[i].PublishedAt == nil {
+			continue
+		}
 		if maxPublishedAt.IsZero() {
 			maxPublishedAt = *f.Items[i].PublishedAt
 		} else if maxPublishedAt.Before(*f.Items[i].PublishedAt) {
@@ -161,7 +164,7 @@ func (fm *Manager) filterItemsAfterByRefTime(f *Feed, refTime time.Time) int {
 	var newItems []FeedItem
 
 	for _, item := range f.Items {
-		if item.PublishedAt.After(refTime) {
+		if item.PublishedAt != nil && item.PublishedAt.After(refTime) {
 			newItems = append(newItems, item)
 		}
 	}

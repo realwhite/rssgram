@@ -8,5 +8,9 @@ func EllipsisString(s string, max int) string {
 	if max > len(s) {
 		return s
 	}
-	return s[:strings.LastIndexAny(s[:max], " .,:;-")] + "..."
+	idx := strings.LastIndexAny(s[:max], " .,:;-")
+	if idx == -1 {
+		return s[:max] + "..."
+	}
+	return s[:idx] + "..."
 }

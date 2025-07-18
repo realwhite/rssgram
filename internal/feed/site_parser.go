@@ -28,7 +28,9 @@ type SiteParser struct {
 }
 
 func (p *SiteParser) setUA(req *http.Request) {
-	req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
+	if len(userAgents) > 0 {
+		req.Header.Set("User-Agent", userAgents[rand.IntN(len(userAgents))])
+	}
 }
 
 func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
@@ -47,9 +49,17 @@ func (p *SiteParser) GetDescription(url string) (SiteDescription, error) {
 		return SiteDescription{}, fmt.Errorf("failed to get content by url %s: status %s", url, resp.Status)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
-	mediaType, _, err := mime.ParseMediaType(resp.Header["Content-Type"][0])
+	contentTypes := resp.Header["Content-Type"]
+	if len(contentTypes) == 0 {
+		return SiteDescription{}, fmt.Errorf("Content-Type header is missing")
+	}
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
 	if err != nil {
 		return SiteDescription{}, fmt.Errorf("failed to parse media type: %w", err)
 	}
