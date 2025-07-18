@@ -56,7 +56,7 @@ type TelegramChannelClientConfig struct {
 
 type TelegramChannelClient struct {
 	conf       TelegramChannelClientConfig
-	httpClient http.Client
+	httpClient *http.Client
 
 	logger *zap.Logger
 }
@@ -177,7 +177,7 @@ func (c *TelegramChannelClient) SendMessage(ctx context.Context, msg string, opt
 func NewTelegramChannelClient(conf TelegramChannelClientConfig, logger *zap.Logger) *TelegramChannelClient {
 	return &TelegramChannelClient{
 		conf:       conf,
-		httpClient: http.Client{},
+		httpClient: &http.Client{},
 		logger:     logger,
 	}
 }
