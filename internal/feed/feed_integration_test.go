@@ -1,4 +1,4 @@
-// Тест создан с помощью AI
+// Test created with AI
 //go:build integration
 // +build integration
 
@@ -63,7 +63,7 @@ func TestFeedManager_GetFeed_RealRSS(t *testing.T) {
 				assert.NotEmpty(t, feed.URL)
 				assert.Greater(t, len(feed.Items), 0)
 
-				// Проверяем структуру первого элемента
+				// Check the structure of the first item
 				if len(feed.Items) > 0 {
 					item := feed.Items[0]
 					assert.NotEmpty(t, item.ID)
@@ -90,14 +90,14 @@ func TestFeedManager_ProcessFeed_RealRSS(t *testing.T) {
 		URL:  "https://news.ycombinator.com/rss",
 	}
 
-	// Мокаем GetFeedByURL для нового фида
+	// Mock GetFeedByURL for the new feed
 	mockRepo.On("GetFeedByURL", mock.Anything, feedConfig.URL).Return(nil, nil)
 	mockRepo.On("UpsertFeed", mock.Anything, feedConfig.URL, mock.Anything, mock.Anything).Return(nil)
 
-	// Тестируем ProcessFeed с реальным RSS
+	// Test ProcessFeed with real RSS
 	err := manager.ProcessFeed(context.Background(), feedConfig, logger)
 
-	// Ожидаем успех для реального RSS
+	// Expect success for real RSS
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }
@@ -110,7 +110,7 @@ func TestFeedManager_EnrichFeedItems(t *testing.T) {
 	mockRepo := &MockRepo{}
 	manager := NewManager(mockRepo)
 
-	// Создаем тестовый фид с описанием типа "link"
+	// Create a test feed with a description type of "link"
 	feed := &Feed{
 		Config: FeedConfig{
 			DescriptionType: FeedDescriptionTypeLink,
@@ -123,7 +123,7 @@ func TestFeedManager_EnrichFeedItems(t *testing.T) {
 		},
 	}
 
-	// Тестируем обогащение элементов
+	// Test enriching items
 	err := manager.EnrichFeedItems(feed)
 	assert.NoError(t, err)
 }

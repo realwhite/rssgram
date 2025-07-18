@@ -1,4 +1,4 @@
-// Тест создан с помощью AI
+// Test created with AI
 package feed
 
 import (
@@ -10,7 +10,7 @@ import (
 )
 
 func TestSiteParser_GetDescription(t *testing.T) {
-	// Создаем тестовый сервер
+	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		html := `
 		<!DOCTYPE html>
@@ -34,19 +34,19 @@ func TestSiteParser_GetDescription(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания
+	// Test getting description
 	description, err := parser.GetDescription(server.URL)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, description)
 	assert.Equal(t, "Test Page Title", description.Title)
 	assert.Equal(t, "Test page description", description.Description)
-	// image не поддерживается парсером, ожидаем пустую строку
+	// image is not supported by the parser, expect an empty string
 	assert.Equal(t, "", description.Image)
 }
 
 func TestSiteParser_GetDescription_NoMeta(t *testing.T) {
-	// Создаем тестовый сервер без мета-тегов
+	// Create a test server without meta-tags
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		html := `
 		<!DOCTYPE html>
@@ -67,7 +67,7 @@ func TestSiteParser_GetDescription_NoMeta(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания
+	// Test getting description
 	description, err := parser.GetDescription(server.URL)
 
 	assert.NoError(t, err)
@@ -80,7 +80,7 @@ func TestSiteParser_GetDescription_NoMeta(t *testing.T) {
 func TestSiteParser_GetDescription_InvalidURL(t *testing.T) {
 	parser := NewSiteParser()
 
-	// Тестируем с невалидным URL
+	// Test with an invalid URL
 	description, err := parser.GetDescription("invalid-url")
 
 	assert.Error(t, err)
@@ -91,7 +91,7 @@ func TestSiteParser_GetDescription_InvalidURL(t *testing.T) {
 }
 
 func TestSiteParser_GetDescription_404(t *testing.T) {
-	// Создаем тестовый сервер, возвращающий 404
+	// Create a test server that returns 404
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -99,7 +99,7 @@ func TestSiteParser_GetDescription_404(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания
+	// Test getting description
 	description, err := parser.GetDescription(server.URL)
 
 	assert.Error(t, err)
@@ -110,9 +110,9 @@ func TestSiteParser_GetDescription_404(t *testing.T) {
 }
 
 func TestSiteParser_GetDescription_Timeout(t *testing.T) {
-	// Создаем тестовый сервер с задержкой
+	// Create a test server with a delay
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Имитируем долгий ответ
+		// Simulate a long response
 		select {
 		case <-r.Context().Done():
 			return
@@ -122,10 +122,10 @@ func TestSiteParser_GetDescription_Timeout(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания с таймаутом
+	// Test getting description with a timeout
 	description, err := parser.GetDescription(server.URL)
 
-	// Ожидаем ошибку таймаута или контекста
+	// Expect a timeout error or context cancellation
 	assert.Error(t, err)
 	assert.NotNil(t, description)
 	assert.Empty(t, description.Title)
@@ -134,7 +134,7 @@ func TestSiteParser_GetDescription_Timeout(t *testing.T) {
 }
 
 func TestSiteParser_GetDescription_NonHTML(t *testing.T) {
-	// Создаем тестовый сервер, возвращающий JSON
+	// Create a test server that returns JSON
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"title": "JSON Response"}`))
@@ -143,10 +143,10 @@ func TestSiteParser_GetDescription_NonHTML(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания
+	// Test getting description
 	description, err := parser.GetDescription(server.URL)
 
-	// Ожидаем ошибку или пустое описание
+	// Expect an error or empty description
 	if err != nil {
 		assert.Error(t, err)
 		assert.NotNil(t, description)
@@ -155,12 +155,12 @@ func TestSiteParser_GetDescription_NonHTML(t *testing.T) {
 		assert.Empty(t, description.Image)
 	} else {
 		assert.NotNil(t, description)
-		// Проверяем, что парсинг прошел, но данные могут быть пустыми
+		// Check if parsing was successful, but data might be empty
 	}
 }
 
 func TestSiteParser_GetDescription_OpenGraph(t *testing.T) {
-	// Создаем тестовый сервер с Open Graph тегами
+	// Create a test server with Open Graph tags
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		html := `
 		<!DOCTYPE html>
@@ -183,13 +183,13 @@ func TestSiteParser_GetDescription_OpenGraph(t *testing.T) {
 
 	parser := NewSiteParser()
 
-	// Тестируем получение описания
+	// Test getting description
 	description, err := parser.GetDescription(server.URL)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, description)
-	// Парсер не поддерживает OG, ожидаем обычный title
+	// The parser does not support OG, expect the regular title
 	assert.Equal(t, "Test Page Title", description.Title)
-	assert.Equal(t, "Open Graph Description", description.Description) // если парсер поддерживает og:description, иначе пусто
+	assert.Equal(t, "Open Graph Description", description.Description) // if the parser supports og:description, otherwise empty
 	assert.Equal(t, "", description.Image)
 }

@@ -68,21 +68,21 @@ func runTestMigrations(db *sql.DB) error {
 }
 
 func TestNewStorage(t *testing.T) {
-	// Создаем временный файл базы данных
+	// Create a temporary database file
 	tmpFile, err := os.CreateTemp("", "test_*.db")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close()
 
-	// Тестируем создание storage
+	// Test creating storage
 	storage, err := NewStorage()
-	// Ожидаем успешное создание storage
+	// Expect successful storage creation
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)
 }
 
 func TestStorage_FeedsOperations(t *testing.T) {
-	// Создаем storage с тестовой базой данных
+	// Create storage with test database
 	storage := &Storage{db: testDB}
 
 	ctx := context.Background()
@@ -99,11 +99,11 @@ func TestStorage_FeedsOperations(t *testing.T) {
 		lastChecked := time.Now().UTC()
 		lastPost := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 
-		// Добавляем фид
+		// Add feed
 		err := storage.UpsertFeed(ctx, url, lastChecked, lastPost)
 		assert.NoError(t, err)
 
-		// Получаем фид
+		// Get feed
 		feed, err := storage.GetFeedByURL(ctx, url)
 		assert.NoError(t, err)
 		assert.NotNil(t, feed)
@@ -115,20 +115,20 @@ func TestStorage_FeedsOperations(t *testing.T) {
 	t.Run("DeleteFeed", func(t *testing.T) {
 		url := "https://example.com/delete-test"
 
-		// Добавляем фид
+		// Add feed
 		err := storage.UpsertFeed(ctx, url, time.Now().UTC(), time.Now().UTC())
 		assert.NoError(t, err)
 
-		// Проверяем, что фид существует
+		// Check if feed exists
 		feed, err := storage.GetFeedByURL(ctx, url)
 		assert.NoError(t, err)
 		assert.NotNil(t, feed)
 
-		// Удаляем фид
+		// Delete feed
 		err = storage.DeleteFeed(ctx, url)
 		assert.NoError(t, err)
 
-		// Проверяем, что фид удален
+		// Check if feed is deleted
 		feed, err = storage.GetFeedByURL(ctx, url)
 		assert.NoError(t, err)
 		assert.Nil(t, feed)
@@ -140,7 +140,7 @@ func TestStorage_ItemsOperations(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("InsertItem and GetItemsReadyToSend", func(t *testing.T) {
-		// Создаем тестовый item
+		// Create test item
 		item := &feed.FeedItem{
 			ID:          "test-item-1",
 			FeedTitle:   "Test Feed",
@@ -152,11 +152,11 @@ func TestStorage_ItemsOperations(t *testing.T) {
 			Tags:        []string{"test", "article"},
 		}
 
-		// Добавляем item
+		// Add item
 		err := storage.InsertItem(ctx, item)
 		assert.NoError(t, err)
 
-		// Получаем items для отправки
+		// Get items for sending
 		items, err := storage.GetItemsReadyToSend(ctx, 0)
 		assert.NoError(t, err)
 		assert.Len(t, items, 1)
@@ -171,7 +171,7 @@ func TestStorage_ItemsOperations(t *testing.T) {
 	t.Run("SetItemIsSent", func(t *testing.T) {
 		itemID := "test-item-2"
 
-		// Создаем и добавляем item
+		// Create and add item
 		item := &feed.FeedItem{
 			ID:          itemID,
 			FeedTitle:   "Test Feed",
@@ -184,25 +184,25 @@ func TestStorage_ItemsOperations(t *testing.T) {
 		err := storage.InsertItem(ctx, item)
 		assert.NoError(t, err)
 
-		// Проверяем, что item готов к отправке
+		// Check if item is ready to send
 		items, err := storage.GetItemsReadyToSend(ctx, 0)
 		assert.NoError(t, err)
-		assert.Len(t, items, 2) // Предыдущий + новый
+		assert.Len(t, items, 2) // Previous + new
 
-		// Отмечаем item как отправленный
+		// Mark item as sent
 		err = storage.SetItemIsSent(ctx, itemID)
 		assert.NoError(t, err)
 
-		// Проверяем, что item больше не готов к отправке
+		// Check if item is no longer ready to send
 		items, err = storage.GetItemsReadyToSend(ctx, 0)
 		assert.NoError(t, err)
-		assert.Len(t, items, 1) // Только первый item
+		assert.Len(t, items, 1) // Only the first item
 	})
 
 	t.Run("IncrementItemFailedCounter", func(t *testing.T) {
 		itemID := "test-item-3"
 
-		// Создаем и добавляем item
+		// Create and add item
 		item := &feed.FeedItem{
 			ID:          itemID,
 			FeedTitle:   "Test Feed",
@@ -215,16 +215,16 @@ func TestStorage_ItemsOperations(t *testing.T) {
 		err := storage.InsertItem(ctx, item)
 		assert.NoError(t, err)
 
-		// Увеличиваем счетчик ошибок
+		// Increment failed counter
 		err = storage.IncrementItemFailedCounter(ctx, itemID)
 		assert.NoError(t, err)
 
-		// Проверяем, что счетчик увеличился
-		// (в реальной реализации нужно добавить метод для получения failed_count)
+		// Check if counter increased
+		// (In a real implementation, you would add a method to get failed_count)
 	})
 
 	t.Run("GetCountItemsSendFailed", func(t *testing.T) {
-		// Добавляем несколько items с ошибками
+		// Add several items with errors
 		items := []*feed.FeedItem{
 			{
 				ID:          "failed-item-1",
@@ -248,12 +248,12 @@ func TestStorage_ItemsOperations(t *testing.T) {
 			err := storage.InsertItem(ctx, item)
 			assert.NoError(t, err)
 
-			// Увеличиваем счетчик ошибок
+			// Increment failed counter
 			err = storage.IncrementItemFailedCounter(ctx, item.ID)
 			assert.NoError(t, err)
 		}
 
-		// Получаем количество items с ошибками
+		// Get count of items with errors
 		count, err := storage.GetCountItemsSendFailed(ctx)
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, count, 2)
@@ -274,20 +274,20 @@ func TestStorage_EdgeCases(t *testing.T) {
 			PublishedAt: timePtr(time.Now().UTC()),
 		}
 
-		// Добавляем item первый раз
+		// Add item first time
 		err := storage.InsertItem(ctx, item)
 		assert.NoError(t, err)
 
-		// Пытаемся добавить item с тем же ID
+		// Try to add item with the same ID
 		err = storage.InsertItem(ctx, item)
 		if err == nil {
-			t.Skip("InsertItem не возвращает ошибку при дубликате, пропускаем тест")
+			t.Skip("InsertItem does not return an error for a duplicate, skipping test")
 		}
-		assert.Error(t, err) // Ожидаем ошибку из-за дубликата
+		assert.Error(t, err) // Expect error due to duplicate
 	})
 
 	t.Run("GetItemsReadyToSend with limit", func(t *testing.T) {
-		// Добавляем несколько items
+		// Add several items
 		for i := 0; i < 5; i++ {
 			item := &feed.FeedItem{
 				ID:          fmt.Sprintf("limit-test-%d", i),
@@ -302,14 +302,14 @@ func TestStorage_EdgeCases(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		// Получаем items с лимитом
+		// Get items with limit
 		items, err := storage.GetItemsReadyToSend(ctx, 3)
 		assert.NoError(t, err)
 		assert.Len(t, items, 3)
 	})
 }
 
-// Вспомогательная функция для создания указателя на время
+// Helper function to create a pointer to a time
 func timePtr(t time.Time) *time.Time {
 	return &t
 }

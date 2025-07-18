@@ -69,11 +69,11 @@ func TestNewFeedItem(t *testing.T) {
 				tt.tags,
 			)
 
-			// Проверяем, что ID генерируется корректно
+			// Check that ID is generated correctly
 			assert.NotEmpty(t, item.ID)
 			assert.Len(t, item.ID, 64) // SHA256 hash length
 
-			// Проверяем остальные поля
+			// Check other fields
 			assert.Equal(t, tt.feedTitle, item.FeedTitle)
 			assert.Equal(t, tt.title, item.Title)
 			assert.Equal(t, tt.link, item.Link)
@@ -131,7 +131,7 @@ func TestFeedItem_GetMetadataJson(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 
-			// Проверяем, что результат является валидным JSON
+			// Check that the result is valid JSON
 			if tt.metadata != nil {
 				var parsed map[string]interface{}
 				err = json.Unmarshal([]byte(result), &parsed)
@@ -182,7 +182,7 @@ func TestFeedItem_GetTagsJson(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 
-			// Проверяем, что результат является валидным JSON
+			// Check that the result is valid JSON
 			var parsed []string
 			err = json.Unmarshal([]byte(result), &parsed)
 			assert.NoError(t, err)
@@ -196,7 +196,7 @@ func TestFeedItem_GetTagsJson(t *testing.T) {
 }
 
 func TestFeedItem_ID_Consistency(t *testing.T) {
-	// Проверяем, что ID генерируется одинаково для одинаковых данных
+	// Check that ID is generated consistently for identical data
 	item1 := NewFeedItem(
 		"Test Feed",
 		"Test Article",
@@ -221,10 +221,10 @@ func TestFeedItem_ID_Consistency(t *testing.T) {
 
 	assert.Equal(t, item1.ID, item2.ID)
 
-	// Проверяем, что разные данные дают разные ID
+	// Check that different data gives different IDs
 	item3 := NewFeedItem(
 		"Test Feed",
-		"Different Article", // Изменено
+		"Different Article", // Changed
 		"https://example.com/article",
 		"https://example.com/image.jpg",
 		"Test description",
@@ -237,21 +237,21 @@ func TestFeedItem_ID_Consistency(t *testing.T) {
 }
 
 func TestFeedItem_ID_Uniqueness(t *testing.T) {
-	// Проверяем уникальность ID для разных данных
+	// Check uniqueness of ID for different data
 	items := make(map[string]bool)
 
 	for i := 0; i < 100; i++ {
 		item := NewFeedItem(
 			"Test Feed",
-			fmt.Sprintf("Test Article %d", i),               // уникальный title
-			fmt.Sprintf("https://example.com/article%d", i), // уникальный link
+			fmt.Sprintf("Test Article %d", i),               // unique title
+			fmt.Sprintf("https://example.com/article%d", i), // unique link
 			"https://example.com/image.jpg",
 			"Test description",
 			timePtr(time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)),
 			nil,
 			[]string{"test"},
 		)
-		// ID должен быть уникальным
+		// ID must be unique
 		assert.False(t, items[item.ID], "Duplicate ID found: %s", item.ID)
 		items[item.ID] = true
 	}
@@ -281,7 +281,7 @@ func TestFeedConfig_Validation(t *testing.T) {
 				URL:             "https://example.com/rss",
 				DescriptionType: "item",
 			},
-			expectValid: true, // Имя может быть пустым
+			expectValid: true, // Name can be empty
 		},
 		{
 			name: "empty URL",
@@ -299,7 +299,7 @@ func TestFeedConfig_Validation(t *testing.T) {
 				URL:             "https://example.com/rss",
 				DescriptionType: "invalid",
 			},
-			expectValid: true, // Описание может быть любым
+			expectValid: true, // Description can be any value
 		},
 	}
 

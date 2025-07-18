@@ -1,4 +1,4 @@
-// Тест создан с помощью AI
+// Test created with AI
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 func TestMain_ParseConfig(t *testing.T) {
-	// Создаем временный конфигурационный файл
+	// Create a temporary config file
 	tempConfig := `
 feeds:
   - name: "Test Feed"
@@ -29,21 +29,21 @@ telegram:
     timezone: "Europe/Moscow"
 `
 
-	// Сохраняем оригинальный файл конфигурации
+	// Save the original config file
 	originalConfig := "config.yaml"
 	if _, err := os.Stat(originalConfig); err == nil {
-		// Если файл существует, переименовываем его
+		// If the file exists, rename it
 		err = os.Rename(originalConfig, originalConfig+".backup")
 		require.NoError(t, err)
 		defer os.Rename(originalConfig+".backup", originalConfig)
 	}
 
-	// Записываем конфигурацию во временный файл
+	// Write the config to a temporary file
 	err := os.WriteFile("config.yaml", []byte(tempConfig), 0644)
 	require.NoError(t, err)
 	defer os.Remove("config.yaml")
 
-	// Тестируем загрузку конфигурации
+	// Test loading the config
 	config, err := internal.ParseConfig()
 
 	assert.NoError(t, err)
@@ -56,16 +56,16 @@ telegram:
 }
 
 func TestMain_ParseConfig_FileNotFound(t *testing.T) {
-	// Сохраняем оригинальный файл конфигурации
+	// Save the original config file
 	originalConfig := "config.yaml"
 	if _, err := os.Stat(originalConfig); err == nil {
-		// Если файл существует, переименовываем его
+		// If the file exists, rename it
 		err = os.Rename(originalConfig, originalConfig+".backup")
 		require.NoError(t, err)
 		defer os.Rename(originalConfig+".backup", originalConfig)
 	}
 
-	// Тестируем загрузку несуществующего файла
+	// Test loading a non-existent file
 	config, err := internal.ParseConfig()
 
 	assert.Error(t, err)
@@ -73,7 +73,7 @@ func TestMain_ParseConfig_FileNotFound(t *testing.T) {
 }
 
 func TestMain_ParseConfig_InvalidYAML(t *testing.T) {
-	// Создаем временный файл с невалидным YAML
+	// Create a temporary file with invalid YAML
 	tempConfig := `
 feeds:
   - name: "Test Feed"
@@ -82,21 +82,21 @@ feeds:
 invalid_yaml: [unclosed_bracket
 `
 
-	// Сохраняем оригинальный файл конфигурации
+	// Save the original config file
 	originalConfig := "config.yaml"
 	if _, err := os.Stat(originalConfig); err == nil {
-		// Если файл существует, переименовываем его
+		// If the file exists, rename it
 		err = os.Rename(originalConfig, originalConfig+".backup")
 		require.NoError(t, err)
 		defer os.Rename(originalConfig+".backup", originalConfig)
 	}
 
-	// Записываем конфигурацию во временный файл
+	// Write the config to a temporary file
 	err := os.WriteFile("config.yaml", []byte(tempConfig), 0644)
 	require.NoError(t, err)
 	defer os.Remove("config.yaml")
 
-	// Тестируем загрузку невалидного YAML
+	// Test loading invalid YAML
 	config, err := internal.ParseConfig()
 
 	assert.Error(t, err)
@@ -104,7 +104,7 @@ invalid_yaml: [unclosed_bracket
 }
 
 func TestMain_ConfigValidation(t *testing.T) {
-	// Тестируем валидацию корректной конфигурации
+	// Test config validation with empty bot token
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{
 			{
@@ -120,7 +120,7 @@ func TestMain_ConfigValidation(t *testing.T) {
 		},
 	}
 
-	// Проверяем, что конфигурация корректна
+	// Check that the config contains an empty token
 	assert.NotNil(t, config)
 	assert.Len(t, config.Feeds, 1)
 	assert.Equal(t, "Test Feed", config.Feeds[0].Name)
@@ -130,7 +130,7 @@ func TestMain_ConfigValidation(t *testing.T) {
 }
 
 func TestMain_ConfigValidation_EmptyFeeds(t *testing.T) {
-	// Тестируем валидацию конфигурации без фидов
+	// Test config validation with empty feeds
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{},
 		Telegram: telegram.TelegramChannelOutputConfig{
@@ -141,17 +141,17 @@ func TestMain_ConfigValidation_EmptyFeeds(t *testing.T) {
 		},
 	}
 
-	// Проверяем, что конфигурация пуста
+	// Check that the config is empty
 	assert.NotNil(t, config)
 	assert.Len(t, config.Feeds, 0)
 }
 
 func TestMain_ConfigValidation_EmptyFeedName(t *testing.T) {
-	// Тестируем валидацию конфигурации с пустым именем фида
+	// Test config validation with empty feed name
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{
 			{
-				Name: "", // Пустое имя
+				Name: "", // Empty name
 				URL:  "https://example.com/rss",
 			},
 		},
@@ -163,14 +163,14 @@ func TestMain_ConfigValidation_EmptyFeedName(t *testing.T) {
 		},
 	}
 
-	// Проверяем, что конфигурация содержит пустое имя
+	// Check that the config contains an empty name
 	assert.NotNil(t, config)
 	assert.Len(t, config.Feeds, 1)
 	assert.Empty(t, config.Feeds[0].Name)
 }
 
 func TestMain_ConfigValidation_EmptyChannelName(t *testing.T) {
-	// Тестируем валидацию конфигурации с пустым именем канала
+	// Test config validation with empty channel name
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{
 			{
@@ -180,19 +180,19 @@ func TestMain_ConfigValidation_EmptyChannelName(t *testing.T) {
 		},
 		Telegram: telegram.TelegramChannelOutputConfig{
 			TelegramChannelClientConfig: telegram.TelegramChannelClientConfig{
-				ChannelName: "", // Пустое имя канала
+				ChannelName: "", // Empty channel name
 				BotToken:    "test_token",
 			},
 		},
 	}
 
-	// Проверяем, что конфигурация содержит пустое имя канала
+	// Check that the config contains an empty channel name
 	assert.NotNil(t, config)
 	assert.Empty(t, config.Telegram.ChannelName)
 }
 
 func TestMain_ConfigValidation_EmptyBotToken(t *testing.T) {
-	// Тестируем валидацию конфигурации с пустым токеном бота
+	// Test config validation with empty bot token
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{
 			{
@@ -203,23 +203,23 @@ func TestMain_ConfigValidation_EmptyBotToken(t *testing.T) {
 		Telegram: telegram.TelegramChannelOutputConfig{
 			TelegramChannelClientConfig: telegram.TelegramChannelClientConfig{
 				ChannelName: "@test_channel",
-				BotToken:    "", // Пустой токен
+				BotToken:    "", // Empty token
 			},
 		},
 	}
 
-	// Проверяем, что конфигурация содержит пустой токен
+	// Check that the config contains an empty token
 	assert.NotNil(t, config)
 	assert.Empty(t, config.Telegram.BotToken)
 }
 
 func TestMain_ConfigValidation_InvalidURL(t *testing.T) {
-	// Тестируем валидацию конфигурации с невалидным URL
+	// Test config validation with invalid URL
 	config := &internal.Config{
 		Feeds: []internal.FeedConfig{
 			{
 				Name: "Test Feed",
-				URL:  "invalid-url", // Невалидный URL
+				URL:  "invalid-url", // Invalid URL
 			},
 		},
 		Telegram: telegram.TelegramChannelOutputConfig{
@@ -230,20 +230,20 @@ func TestMain_ConfigValidation_InvalidURL(t *testing.T) {
 		},
 	}
 
-	// Проверяем, что конфигурация содержит невалидный URL
+	// Check that the config contains an invalid URL
 	assert.NotNil(t, config)
 	assert.Len(t, config.Feeds, 1)
 	assert.Equal(t, "invalid-url", config.Feeds[0].URL)
 }
 
 func TestMain_RunMigrate(t *testing.T) {
-	// Тестируем выполнение миграций
+	// Test running migrations
 	err := runMigrate()
 
-	// Ожидаем либо успех, либо ошибку, но не панику
-	// Миграции могут уже быть применены, поэтому ошибка "no change" допустима
+	// Expect either success or an error, but not a panic
+	// Migrations may already be applied, so "no change" error is acceptable
 	if err != nil {
-		// Проверяем, что это не критическая ошибка
+		// Check that this is not a critical error
 		assert.Contains(t, err.Error(), "no change")
 	}
 }
