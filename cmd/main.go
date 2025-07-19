@@ -216,8 +216,17 @@ func _itemSender(ctx context.Context, cnf *internal.Config, storage *sqlite.Stor
 }
 
 func metricHandler(ctx context.Context, cnf *internal.Config, logger *zap.Logger) {
+	if !cnf.Metrics.Enabled {
+		logger.Info("metrics disabled")
+		return
+	}
+
+	if cnf.Metrics.Port == 0 {
+		logger.Warn("metrics port must be greater than 0")
+		return
+	}
 
 	http.Handle("/metrics", promhttp.Handler())
-	logger.Info("start to serve /metrics on 2222 port")
-	http.ListenAndServe(":2222", nil)
+	logger.Info(fmt.Sprintf("start to serve /metrics on %d port", cnf.Metrics.Port))
+	http.ListenAndServe(fmt.Sprintf(":%d", cnf.Metrics.Port), nil)
 }

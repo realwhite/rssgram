@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -128,6 +129,11 @@ func (s *Storage) GetItemsReadyToSend(ctx context.Context, limit int) ([]feed.Fe
 			return nil, fmt.Errorf("failed to convert published_at (%s): %w", item, err)
 		}
 		item.PublishedAt = &parsedPublishedAt
+
+		err = json.Unmarshal([]byte(tmpTags), &item.Tags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tags: %w", err)
+		}
 
 		items = append(items, item)
 	}

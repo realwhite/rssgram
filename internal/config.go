@@ -18,10 +18,16 @@ type FeedConfig struct {
 	Tags            []string `yaml:"tags"`
 }
 
+type MetricsConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Port    int  `yaml:"port"`
+}
+
 type Config struct {
 	Feeds      []FeedConfig                         `yaml:"feeds"`
 	Telegram   telegram.TelegramChannelOutputConfig `yaml:"telegram"`
 	EnableTags bool                                 `yaml:"enable_tags"`
+	Metrics    MetricsConfig                        `yaml:"metrics"`
 }
 
 func ParseConfig() (*Config, error) {

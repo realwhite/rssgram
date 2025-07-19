@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"rssgram/internal/feed"
@@ -96,6 +97,7 @@ func (o *TelegramChannelOutput) Push(ctx context.Context, item *feed.FeedItem) (
 	if o.enableTags && len(item.Tags) > 0 {
 		tags := ""
 		for _, tag := range item.Tags {
+			tag = strings.ReplaceAll(tag, " ", "_")
 			tags += "#" + tag + " "
 		}
 		tags = tags[:len(tags)-1] // убрать последний пробел

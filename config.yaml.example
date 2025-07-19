@@ -5,6 +5,9 @@ telegram:
     start: "23:00:00"
     finish: "08:00:00"
     timezone: "Europe/Moscow"
+metrics:
+	enabled: true
+	port: 2222
 
 enable_tags: true
 
